@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <style>
+        footer {
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            text-align: center;
+        }
+    </style>
+    <title> Rock, Paper, Scissors </title>
+</head>
+
+<body>
+
+    <!-- Game Output-->
+
+    <section id="game">
+    </section>
+
+
+    <!-- Content Templates -->
+    <template id="startScreen">
+        <div>
+            <label for="playerNameInput">Navn</label>
+            <input type="text" id="playerNameInput" placeholder="spiller navn" />
+            <button id="startNewGame" onclick="startNewGame()">Nytt spill</button>
+        </div>
+    </template>
+
+    <template id="joinScreen">
+        <div>
+            <label for="playerNameInput">Navn</label>
+            <input type="text" id="playerNameInput" placeholder="spiller navn" />
+            <button id="joinGame" onclick="joinGame()">Start</button>
+        </div>
+    </template>
+
+    <template id="selectActionScreen">
+        <div>
+            <button id="rock" onclick="select('rock')">
+                <img src="img/rock.png">
+            </button>
+            <button id="paper" onclick="select('paper')">
+                <img src="img/paper.png">
+            </button>
+            <button id="scissors" onclick="select('sicorss')">
+                <img src="img/sicorss.png">
+            </button>
+        </div>
+    </template>
+
+    <template id="outcomeScreen">
+        <div>
+
+        </div>
+    </template>
+
+
+    <!-- Art / Resource Credists-->
+    <footer>
+        Rock, Paper, Scissors by Monjin Friends from the Noun Project
+    </footer>
+
+    <!-- Application logic-->
+    <script>
+        const DEBUG = true;
+        let gameId = null;
+        let firstPlayer = null;
+        let secondPlayer = null;
+
+        document.addEventListener("DOMContentLoaded", event => {
+            log("App loaded");
+            if (location.hash) {
+                showJoinGameScreen(location.hash);
+            } else {
+                showStartNewGameScreen();
+            }
+        });
+
+        function showStartNewGameScreen() {
+            log("Show start new game screen");
+            let template = getScreenTemplate("startScreen");
+            setScreen(template);
+        }
+
+        function showJoinGameScreen(game) {
+            log("Show join existing game screen");
+            gameId = game;
+            let template = getScreenTemplate("joinScreen");
+            setScreen(template);
+        }
+
+        function startNewGame() {
+            log("start new game");
+
+            let playerName = document.body.querySelector("#playerNameInput").value;
+
+            if (playerName) {
+                // Define the first player object.
+                firstPlayer = {
+                    "name": playerName,
+                    "selection": null
+                };
+                // Tell the server to start a new game.
+                fetch("/game", {
+                    method: "POST",
+                    cache: "no-cache",
+                    headers: {
+                        "Content-Type": "application/json; charset=utf-8",
+                    },
+                    body: JSON.stringify(firstPlayer)
+                }).then(resp => {
+                    resp.json();
+                }).then(json => {
+                    parseGameState(json);
+                    startGame();
+
+                }).catch(err => {
+                    log("Create game failed")
+                    log(err);
+                });
+
+            } else {
+                // This is where we would give some feadback to the user about not having given a name.
+                err("No name given for starting player");
+            }
+
+        }
+
+        function joinGame() {
+            log("join game");
+
+            let playerName = document.body.querySelector("#playerNameInput").value;
+            // Define the second player object.
+            secondPlayer = {
+ x               "name": playerName,
+                "selection": null
+            };
+
+            fetch(`/game/join/${gameId}`, {
+                method: "POST",
+                cache: "no-cache",
+                headers: {
+                    "Content-Type": "application/json; charset=utf-8",
+                },
+                body: JSON.stringify(secondPlayer)
+            }).then(resp => {
+                resp.json();
+            }).then(json => {
+                parseGameState(json);
+                startGame();
+            }).catch(err => {
+                log("Joining game failed")
+                log(err);
+            });
+        }
+
+        function startGame() {
+            let template = getScreenTemplate("joinScreen");
+            setScreen(template);
+        }
+
+        function parseGameState(gameState) {
+            gameId = gameState.gameId;
+            firstPlayer = gameState.firstPlayer;
+            secondPlayer = gameState.secondPlayer;
+        }
+
+        function getScreenTemplate(templateName) {
+            let selector = `#${templateName}`;
+            let template = document.querySelector(selector);
+            return document.importNode(template.content, true);
+        }
+
+        function setScreen(newScreen) {
+            let game = document.querySelector("#game");
+            game.innerHTML = "";
+            game.appendChild(newScreen);
+        }
+
+        function log(msg) {
+            if (DEBUG) {
+                console.log(msg);
+            }
+        }
+
+        function err(msg) {
+            if (DEBUG) {
+                console.error(msg);
+            }
+        }
+    </script>
+
+</body>
+
+</html>
