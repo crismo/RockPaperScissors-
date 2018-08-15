@@ -1,7 +1,7 @@
 {
-  "name": "tictactoe",
+  "name": "rockpaperscissors",
   "version": "1.0.0",
-  "description": "A simple two player game of tic tac toe",
+  "description": "A simple two player game of rock paper scissors",
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

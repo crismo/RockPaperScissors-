@@ -2,7 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
 
-const games = [];
+const applicationState = [];
 
 app.set('port', (process.env.PORT || 8080));
 app.use(express.static('public'));
@@ -13,58 +13,67 @@ app.use(function(err, req, res, next) {
     res.status(500).send('Oops thats bad');
 });
 
-app.post("/game", function(req,res,next){
-    let newGameId = createRandomUniqueGameId();
-    let firstPlayer = req.body;
-    let game = {gameId:newGameId, firstPlayer:firstPlayer, secondPlayer:null};
-    games.push(game);
-    res.json(JSON.stringify(game)).end();
+// Create a new session
+app.post("/app", function(req,res,next){
+    let sessionId = createRandomUniqueSessionId();
+    console.log(`Creating new sheard session  ${sessionId}`);
+    let clientData = req.body;
+    let session = {id:sessionId, data:clientData };
+    applicationState.push(session);
+    res.status(201).json(session).end();
 });
 
-app.put("/game/join/:gameId", function(req,res,next){
-    let gameId = req.params.gameId
-    let game =  data.games.find(item => item.gameid == gameId);
-    if(game){
-        game.secondPlayer = req.body;
-        res.status(200).json(JSON.stringify(game)).end();
-    } else{
-        res.status(404).end();
-    }
-})
-
-app.put("/game/:gameId", function(req,res,next){
-    let gameId = req.params.gameId
-    let game =  data.games.find(item => item.gameid == gameId);
-    let player = req.body;
-    if( game){
-        
-        if(game.firstPlayer.name === player.name){
-            game.firstPlayer = player;
-        } else{
-            game.secondPlayer = player;
-        }
-        
-        res.status(200).json(JSON.stringify(game)).end();
-
+// Update an existing session
+app.put("/app/:Id", function(req,res,next){
+    let sessionId = req.params.Id
+    let session = retriveSharedSession(sessionId);
+    if( session ){
+        let clientData = req.body;
+        session.data = clientData;
+        res.status(200).json(session).end();
     }else{
         res.status(404).end();
     }
 });
 
-app.get("/game/:gameId", function(req,res,next){
-    let game =  data.games.find(item => item.gameid == gameId);
-    if(game){
-        res.status(200).json(JSON.stringify(game)).end();
+app.delete("/app/:id", function(req,res,next){
+    let sessionId = req.params.Id
+    if( deleteSharedSession(sessionId) ){
+        res.status(200).json({}).end();
+    } else{
+        res.status(404).end();
+    }
+});
+
+// Get info about an existing session
+app.get("/app/:Id", function(req,res,next){
+    let sessionId = req.params.Id
+    let session = retriveSharedSession(sessionId);
+    if(session){
+        res.status(200).json(session).end();
     } else{
         res.status(404).end();
     }
 });
 
 app.listen(app.get('port'), function() {
-    console.log('Rock, Paper, Scissors server running', app.get('port'));
+    console.log('Simple Server Running', app.get('port'));
 });
 
-function createRandomUniqueGameId(){
+function deleteSharedSession(sessionId){
+    let index = applicationState.findIndex(session => session.id == sessionId);
+    if(index >= 0){
+        applicationState = applicationState.splice(index,1);
+        return true;
+    }
+    return false;
+}
+
+function retriveSharedSession(sessionId){
+    return applicationState.find( session => session.id == sessionId);
+}
+
+function createRandomUniqueSessionId(){
     /// TODO: make certain that this is unique.
     return (Math.random()+1).toString(36).substr(2, 5);
 }

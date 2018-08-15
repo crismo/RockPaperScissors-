@@ -13,17 +13,17 @@
             width: 100%;
             text-align: center;
         }
+
+        img{
+            width: 200px;
+        }
     </style>
     <title> Rock, Paper, Scissors </title>
 </head>
 
 <body>
-
     <!-- Game Output-->
-
-    <section id="game">
-    </section>
-
+    <section id="game"></section>
 
     <!-- Content Templates -->
     <template id="startScreen">
@@ -44,21 +44,22 @@
 
     <template id="selectActionScreen">
         <div>
-            <button id="rock" onclick="select('rock')">
+            <div id="shearableLink"></div>
+            <button id="rock" onclick="selectGameAction('rock')">
                 <img src="img/rock.png">
             </button>
-            <button id="paper" onclick="select('paper')">
+            <button id="paper" onclick="selectGameAction('paper')">
                 <img src="img/paper.png">
             </button>
-            <button id="scissors" onclick="select('sicorss')">
+            <button id="scissors" onclick="selectGameAction('sicorss')">
                 <img src="img/sicorss.png">
             </button>
         </div>
     </template>
 
     <template id="outcomeScreen">
-        <div>
-
+        <div id="results">
+            Venter på motstander
         </div>
     </template>
 
@@ -71,15 +72,20 @@
     <!-- Application logic-->
     <script>
         const DEBUG = true;
-        let gameId = null;
-        let firstPlayer = null;
-        let secondPlayer = null;
+        var gameId = null;
+        var isStartPlayer = false;
+        var firstPlayer = null;
+        var secondPlayer = null;
 
         document.addEventListener("DOMContentLoaded", event => {
             log("App loaded");
             if (location.hash) {
-                showJoinGameScreen(location.hash);
+                gameId = location.hash.replace("#", "");
+                fetchGameState(gameId).then(data => {
+                    showJoinGameScreen();
+                });
             } else {
+                isStartPlayer = true;
                 showStartNewGameScreen();
             }
         });
@@ -92,45 +98,105 @@
 
         function showJoinGameScreen(game) {
             log("Show join existing game screen");
-            gameId = game;
             let template = getScreenTemplate("joinScreen");
             setScreen(template);
+        }
+
+        function showResultScreen() {
+            let template = getScreenTemplate("outcomeScreen");
+            setScreen(template);
+
+            let res = document.getElementById("results");
+            res.innerHTML =
+                `<img src="img\\${firstPlayer.selection}.png"> ${firstPlayer.name} VS <img src="img\\${secondPlayer.selection}.png"> ${secondPlayer.name}`;
+        }
+
+        function fetchGameState(id) {
+            return fetch(`/app/${id}`, {
+                method: "GET",
+                cache: "no-cache",
+                headers: {
+                    'Accept': 'application/json',
+                }
+            }).then(resp => {
+                return resp.json();
+            }).then(json => {
+                parseSessionState(json);
+                return Promise.resolve(json);
+            }).catch(err => {
+                log("Fetching Game data failed")
+                log(err);
+            });
+        }
+
+        function updateGameState(id) {
+            return fetch(`/app/${id}`, {
+                method: "PUT",
+                cache: "no-cache",
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    firstPlayer: firstPlayer,
+                    secondPlayer: secondPlayer
+                })
+            }).then(resp => {
+                return resp.json();
+            });
         }
 
         function startNewGame() {
             log("start new game");
 
-            let playerName = document.body.querySelector("#playerNameInput").value;
+            firstPlayer = {
+                name: document.body.querySelector("#playerNameInput").value,
+                selection: null
+            };
+            // Tell the server to start a new game.
+            fetch("/app", {
+                method: "POST",
+                cache: "no-cache",
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    "firstPlayer": firstPlayer,
+                    "secondPlayer": null
+                })
+            }).then((resp) => {
+                return resp.json();
+            }).then((json) => {
+                parseSessionState(json);
+                showGameActionsScreen();
+            }).catch((err) => {
+                log("Create game failed")
+                log(err);
+            });
+        }
 
-            if (playerName) {
-                // Define the first player object.
-                firstPlayer = {
-                    "name": playerName,
-                    "selection": null
-                };
-                // Tell the server to start a new game.
-                fetch("/game", {
-                    method: "POST",
-                    cache: "no-cache",
-                    headers: {
-                        "Content-Type": "application/json; charset=utf-8",
-                    },
-                    body: JSON.stringify(firstPlayer)
-                }).then(resp => {
-                    resp.json();
-                }).then(json => {
-                    parseGameState(json);
-                    startGame();
+        function selectGameAction(action) {
 
-                }).catch(err => {
-                    log("Create game failed")
-                    log(err);
+            fetchGameState(gameId).then(data => {
+                if (isStartPlayer) {
+                    log("setting first player action");
+                    firstPlayer.selection = action;
+                } else {
+                    log("setting second player action");
+                    secondPlayer.selection = action
+                }
+
+                updateGameState(gameId).then(data => {
+                    if (secondPlayer && firstPlayer.selection && secondPlayer.selection) {
+                        showResultScreen();
+                    } else {
+                        showGameWaitScreen();
+                    }
                 });
 
-            } else {
-                // This is where we would give some feadback to the user about not having given a name.
-                err("No name given for starting player");
-            }
+            })
+
 
         }
 
@@ -140,35 +206,43 @@
             let playerName = document.body.querySelector("#playerNameInput").value;
             // Define the second player object.
             secondPlayer = {
- x               "name": playerName,
+                "name": playerName,
                 "selection": null
             };
 
-            fetch(`/game/join/${gameId}`, {
-                method: "POST",
-                cache: "no-cache",
-                headers: {
-                    "Content-Type": "application/json; charset=utf-8",
-                },
-                body: JSON.stringify(secondPlayer)
-            }).then(resp => {
-                resp.json();
-            }).then(json => {
-                parseGameState(json);
-                startGame();
-            }).catch(err => {
-                log("Joining game failed")
-                log(err);
+            updateGameState(gameId).then(function (json) {
+                parseSessionState(json);
+                showGameActionsScreen();
             });
         }
 
-        function startGame() {
-            let template = getScreenTemplate("joinScreen");
+        function showGameActionsScreen() {
+            let template = getScreenTemplate("selectActionScreen");
             setScreen(template);
+            if (isStartPlayer) {
+                document.getElementById("shearableLink").innerHTML =
+                    `Share link with oponent: <a href="${location.toString()}\#${gameId}" target="_blank">${location.toString()}\#${gameId}</a>`;
+            }
         }
 
-        function parseGameState(gameState) {
-            gameId = gameState.gameId;
+        function showGameWaitScreen() {
+            let template = getScreenTemplate("outcomeScreen");
+            setScreen(template);
+
+            setTimeout(() => {
+                fetchGameState(gameId).then(data => {
+                    if (secondPlayer && firstPlayer.selection && secondPlayer.selection) {
+                        showResultScreen();
+                    } else {
+                        showGameWaitScreen();
+                    }
+                });
+            }, 1000);
+        }
+
+        function parseSessionState(state) {
+            gameId = state.id;
+            let gameState = state.data;
             firstPlayer = gameState.firstPlayer;
             secondPlayer = gameState.secondPlayer;
         }
